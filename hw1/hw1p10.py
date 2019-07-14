@@ -7,7 +7,7 @@ import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
 def main():
-    # """"Performs various mult lin reg operaitons on Auto data set."""
+    """Performs various mult lin reg operaitons on Auto data set."""
     # Part a
     df = pd.read_csv('data/ch3_q14_simulation.csv')
 

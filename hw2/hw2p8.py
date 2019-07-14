@@ -4,37 +4,24 @@ import pandas as pd
 import statsmodels.api as sm
 
 
-def compute_error_rate(df, ind_vars, seed):
-    """Computes the logistic regression error rate on a test set."""
-    (n, p) = df.shape
-    n_train = int(0.5 * n)
-
-    # Split data into train and test sets.
-    np.random.seed(seed)
-    ind_train = np.sort(np.random.choice(n, n_train, replace=False))
-    ind_test = np.setdiff1d(np.arange(n), ind_train)
-    df_train = df.loc[ind_train]
-    df_test = df.loc[ind_test]
-
-    y_train = df_train['bool default']
-    y_test = df_test['bool default']
-    x_train = sm.add_constant(df_train[ind_vars])
-    x_test = sm.add_constant(df_test[ind_vars])
-
-    # Fit logistic regression model and predict error rate.
-    model = sm.Logit(y_train, x_train).fit()
-    pred_table = confusion_matrix(model, x_test, y_test)
-    error_rate = 1 - np.trace(pred_table) / np.sum(pred_table)
-    return error_rate
-
-
-def confusion_matrix(model, x_test, y_test):
-    """"Prints the confusion matrix."""
-    pred = np.array(model.predict(x_test) > 0.5, dtype=float)
-    return np.transpose(np.histogram2d(y_test, pred, bins=2)[0])
-
 def boot_fn(df, ind):
-    pass
+    """Returns the logistic regression coefficients for a data sample (Part b)."""
+    df_new = df.loc[ind]
+    ind_vars = ['income', 'balance']
+    Y = df_new['bool default']
+    X = sm.add_constant(df_new[ind_vars])
+    model = sm.Logit(Y, X).fit()
+    return model.params.values
+
+
+def stan_errs(coeffs):
+    """Computes the bootstrap standard errors (Part c)."""
+    B, p = coeffs.shape
+    standard_errors = np.zeros(p)
+    for jj in range(p):
+        standard_errors[jj] = np.sqrt(1 / (B - 1) * np.sum((coeffs[:, jj] - \
+                              np.mean(coeffs[:, jj])) ** 2.0))
+    return standard_errors
 
 
 def main():
@@ -50,34 +37,24 @@ def main():
     X = sm.add_constant(df[ind_vars])
     model = sm.Logit(Y, X).fit()
     print(model.summary())
+    print('Standard errors')
+    print(model.bse)
 
-    ## Part b
-    ## Compute error rate using validation set approach three times.
-    #seed = np.array([801, 859, 989, 123])
-    #error_rate = np.zeros(len(seed))
-    #for ii in range(len(seed)):
-    #    error_rate[ii] = compute_error_rate(df, ind_vars, seed[ii])
+    ## Part b/c
+    n_ind = len(df)
+    n_boot_iters = 1000
+    np.random.seed(123)
 
-    #print('1st error rate = {:.5f}'.format(error_rate[0]))
-    #print('2nd error rate = {:.5f}'.format(error_rate[1]))
-    #print('3rd error rate = {:.5f}'.format(error_rate[2]))
-    #print('4th error rate = {:.5f}'.format(error_rate[3]))
+    coefficients = np.zeros([n_boot_iters, len(ind_vars) + 1])
+    for ii in range(n_boot_iters):
+        ind = np.random.choice(n_ind, n_ind, replace=True)
+        coefficients[ii, :] = boot_fn(df, ind)
 
-    ## Part d
-    ## Add student as a dummy variable to dataframe.
-    #dummy_student = pd.get_dummies(df['student'], prefix='student')
-    #df = df.join(dummy_student.loc[:, 'student_Yes'])
-    #ind_vars = ['income', 'balance', 'student_Yes']
-
-    ## Compute error rate using validation set approach three times (with student).
-    #error_rate = np.zeros(len(seed))
-    #for ii in range(len(seed)):
-    #    error_rate[ii] = compute_error_rate(df, ind_vars, seed[ii])
-
-    #print('1st error rate (w/ student dummy) = {:.5f}'.format(error_rate[0]))
-    #print('2nd error rate (w/ student dummy) = {:.5f}'.format(error_rate[1]))
-    #print('3rd error rate (w/ student dummy) = {:.5f}'.format(error_rate[2]))
-    #print('4th error rate (w/ student dummy) = {:.5f}'.format(error_rate[3]))
+    standard_errors = stan_errs(coefficients)
+    print('            Coefficient  Standard Error')
+    print('Intercept:  {:.3e}   {:.3e}'.format(np.mean(coefficients[:, 0]), standard_errors[0]))
+    print('income:     {:.3e}   {:.3e}'.format(np.mean(coefficients[:, 1]), standard_errors[1]))
+    print('balance:    {:.3e}   {:.3e}'.format(np.mean(coefficients[:, 2]), standard_errors[2]))
 
 
 if __name__ == '__main__':
